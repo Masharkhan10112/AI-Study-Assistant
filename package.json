@@ -1,0 +1,19 @@
+{
+  "name": "ai-study-assistant",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "db:lint": "supabase db lint --level warning",
+    "db:test": "supabase test db",
+    "gen:types": "supabase gen types typescript --local > src/types/database.types.ts"
+  },
+  "devDependencies": {
+    "supabase": "^2.118.0"
+  }
+}
