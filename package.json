@@ -11,6 +11,9 @@
     "db:diff": "supabase db diff",
     "db:lint": "supabase db lint --level warning",
     "db:test": "supabase test db",
+    "fn:serve": "supabase functions serve",
+    "fn:test": "deno test --allow-env supabase/functions",
+    "fn:check": "deno check supabase/functions/**/*.ts && deno lint supabase/functions && deno fmt --check supabase/functions",
     "gen:types": "supabase gen types typescript --local > src/types/database.types.ts"
   },
   "devDependencies": {
