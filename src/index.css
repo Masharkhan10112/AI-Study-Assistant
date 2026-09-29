@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  /* Keep the layout usable on phones with a notch and on iOS Safari, where
+     100vh overshoots the visible viewport. */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+}
+
+@layer components {
+  .prose-study {
+    @apply text-sm leading-relaxed text-slate-700;
+  }
+  .prose-study h1 {
+    @apply mb-2 mt-4 text-lg font-semibold text-slate-900 first:mt-0;
+  }
+  .prose-study h2 {
+    @apply mb-2 mt-4 text-base font-semibold text-slate-900 first:mt-0;
+  }
+  .prose-study h3 {
+    @apply mb-1 mt-3 text-sm font-semibold text-slate-900;
+  }
+  .prose-study p {
+    @apply mb-3 last:mb-0;
+  }
+  .prose-study ul {
+    @apply mb-3 list-disc space-y-1 pl-5;
+  }
+  .prose-study ol {
+    @apply mb-3 list-decimal space-y-1 pl-5;
+  }
+  .prose-study code {
+    @apply rounded bg-slate-100 px-1 py-0.5 text-xs;
+  }
+  .prose-study strong {
+    @apply font-semibold text-slate-900;
+  }
+  .prose-study blockquote {
+    @apply mb-3 border-l-2 border-slate-200 pl-3 italic;
+  }
+}
