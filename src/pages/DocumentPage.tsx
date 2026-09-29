@@ -70,15 +70,19 @@ export function DocumentPage() {
                 Open file
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RefreshCw className="h-4 w-4" />}
-              loading={reingest.isPending}
-              onClick={() => reingest.mutate(current.id)}
-            >
-              Re-ingest
-            </Button>
+            {/* Pasted notes have no stored source to re-read, so re-ingesting
+                them would only fail the document. */}
+            {current.source_type !== "paste" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RefreshCw className="h-4 w-4" />}
+                loading={reingest.isPending}
+                onClick={() => reingest.mutate(current.id)}
+              >
+                Re-ingest
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

@@ -9,6 +9,12 @@ if (!url || !anonKey) {
   );
 }
 
+// Access and refresh tokens travel on every request, so plain HTTP is only
+// ever the local stack.
+if (url.startsWith("http://") && window.location.protocol === "https:") {
+  throw new Error("VITE_SUPABASE_URL must use https when the app is served over https.");
+}
+
 export const supabase = createClient(url, anonKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });

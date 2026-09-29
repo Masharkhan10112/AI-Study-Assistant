@@ -262,7 +262,9 @@ function handleFrame(frame: string, callbacks: ChatCallbacks): void {
     case "done":
       callbacks.onDone?.(payload as { message_id: string; citations: ChatCitation[] });
       break;
-    case "error":
-      throw new ApiError(payload.code as ApiErrorCode, payload.message as string);
+    case "error": {
+      const error = payload.error as { code: string; message: string };
+      throw new ApiError(error.code as ApiErrorCode, error.message);
+    }
   }
 }

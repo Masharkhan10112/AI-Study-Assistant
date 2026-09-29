@@ -25,8 +25,13 @@ export function TutorPage() {
   const [threadListOpen, setThreadListOpen] = useState(false);
 
   const messages = useMessages(activeThreadId ?? undefined);
-  const stream = useChatStream(activeThreadId ?? undefined);
+  const stream = useChatStream();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // A stream belongs to the chat it was started in; another chat must not show
+  // its answer or be blocked by it.
+  const streamingAnswer = stream.answer?.threadId === activeThreadId ? stream.answer : null;
+  const streaming = stream.pendingThreadId === activeThreadId;
 
   useEffect(() => {
     if (!activeThreadId && threads.data && threads.data.length > 0) setActiveThreadId(threads.data[0].id);
@@ -34,7 +39,7 @@ export function TutorPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.data, stream.answer]);
+  }, [messages.data, streamingAnswer]);
 
   async function onNewThread() {
     if (!user) return;
@@ -50,7 +55,7 @@ export function TutorPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || stream.pending) return;
+    if (!message || streaming) return;
 
     let threadId = activeThreadId;
     if (!threadId && user) {
@@ -66,7 +71,7 @@ export function TutorPage() {
     if (!threadId) return;
 
     setDraft("");
-    await stream.send(message, scopeSubjectId ? { subject_id: scopeSubjectId } : undefined);
+    await stream.send(threadId, message, scopeSubjectId ? { subject_id: scopeSubjectId } : undefined);
   }
 
   const threadList = (
@@ -153,7 +158,7 @@ export function TutorPage() {
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
           {messages.isLoading && activeThreadId
             ? <LoadingBlock />
-            : (messages.data?.length ?? 0) === 0 && !stream.answer
+            : (messages.data?.length ?? 0) === 0 && !streamingAnswer
             ? (
               <EmptyState
                 icon={<MessagesSquare className="h-8 w-8" />}
@@ -165,12 +170,12 @@ export function TutorPage() {
               <MessageBubble key={message.id} role={message.role} content={message.content} />
             ))}
 
-          {stream.answer && (
+          {streamingAnswer && (
             <MessageBubble
               role="assistant"
-              content={stream.answer.content || "…"}
+              content={streamingAnswer.content || "…"}
               streaming
-              footer={<SourceList sources={stream.answer.sources} documents={documents.data ?? []} />}
+              footer={<SourceList sources={streamingAnswer.sources} documents={documents.data ?? []} />}
             />
           )}
 
@@ -193,7 +198,7 @@ export function TutorPage() {
               placeholder="Ask about your notes…"
               className="max-h-40 min-h-[2.75rem] flex-1 resize-y rounded-lg border-0 px-3 py-2.5 text-sm shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-brand-600"
             />
-            {stream.pending
+            {streaming
               ? (
                 <Button type="button" variant="secondary" icon={<Square className="h-4 w-4" />} onClick={stream.stop}>
                   Stop

@@ -67,6 +67,7 @@ export function useDeleteThread() {
 }
 
 export interface StreamingAnswer {
+  threadId: string;
   content: string;
   sources: ChatSource[];
 }
@@ -74,24 +75,25 @@ export interface StreamingAnswer {
 /**
  * Drives one streamed turn. The answer is held in local state while it streams
  * and the message list is refetched on `done`, so the rendered transcript is
- * always what the server actually persisted.
+ * always what the server actually persisted. Both the answer and the pending
+ * flag carry their thread id, so switching chats mid-stream never shows one
+ * chat's answer under another's.
  */
-export function useChatStream(threadId: string | undefined) {
+export function useChatStream() {
   const queryClient = useQueryClient();
   const [answer, setAnswer] = useState<StreamingAnswer | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [pending, setPending] = useState(false);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const send = useCallback(async (message: string, scope?: ChatScope) => {
-    if (!threadId) return;
+  const send = useCallback(async (threadId: string, message: string, scope?: ChatScope) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setPending(true);
+    setPendingThreadId(threadId);
     setError(null);
-    setAnswer({ content: "", sources: [] });
+    setAnswer({ threadId, content: "", sources: [] });
 
     // Show the question immediately; the server persists it as the turn starts.
     queryClient.setQueryData<ChatMessage[]>(["messages", threadId], (previous) => [
@@ -108,9 +110,13 @@ export function useChatStream(threadId: string | undefined) {
     try {
       await streamChat({ thread_id: threadId, message, scope }, {
         signal: controller.signal,
-        onSources: (sources) => setAnswer((current) => ({ content: current?.content ?? "", sources })),
+        onSources: (sources) => setAnswer((current) => ({ threadId, content: current?.content ?? "", sources })),
         onToken: (delta) =>
-          setAnswer((current) => ({ content: (current?.content ?? "") + delta, sources: current?.sources ?? [] })),
+          setAnswer((current) => ({
+            threadId,
+            content: (current?.content ?? "") + delta,
+            sources: current?.sources ?? [],
+          })),
         onDone: () => {
           setAnswer(null);
           queryClient.invalidateQueries({ queryKey: ["messages", threadId] });
@@ -123,13 +129,13 @@ export function useChatStream(threadId: string | undefined) {
       setAnswer(null);
       queryClient.invalidateQueries({ queryKey: ["messages", threadId] });
     } finally {
-      setPending(false);
+      setPendingThreadId((current) => (current === threadId ? null : current));
     }
-  }, [threadId, queryClient]);
+  }, [queryClient]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
-  return { answer, error, pending, send, stop };
+  return { answer, error, pendingThreadId, send, stop };
 }
 
 export function useCitations(messageIds: string[]) {

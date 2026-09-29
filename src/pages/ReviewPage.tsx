@@ -8,8 +8,8 @@ import { Select } from "@/components/ui/Field";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, ErrorNotice, LoadingBlock } from "@/components/ui/Feedback";
 import { useCardSchedule, useDecks, useDueCards, useReviewCard, useReviewStats } from "@/hooks/useStudy";
-import { useAuth } from "@/providers/AuthProvider";
 import { previewIntervals, type Rating } from "@/lib/scheduling";
+import type { DueCard } from "@/lib/types";
 
 const RATINGS: { rating: Rating; label: string; className: string }[] = [
   { rating: 1, label: "Again", className: "bg-rose-600 hover:bg-rose-700 text-white" },
@@ -19,19 +19,23 @@ const RATINGS: { rating: Rating; label: string; className: string }[] = [
 ];
 
 export function ReviewPage() {
-  const { user } = useAuth();
   const decks = useDecks();
   const [deckId, setDeckId] = useState("");
   const dueCards = useDueCards(deckId || null);
   const stats = useReviewStats();
   const reviewCard = useReviewCard();
 
-  const [index, setIndex] = useState(0);
+  // The due-card query refetches after every rating, so session progress is
+  // tracked by card id rather than by an index into a list that shrinks.
+  const [reviewed, setReviewed] = useState<string[]>([]);
   const [revealed, setRevealed] = useState(false);
   const shownAt = useRef(Date.now());
 
-  const queue = dueCards.data ?? [];
-  const card = queue[index];
+  const queue: DueCard[] = useMemo(
+    () => (dueCards.data ?? []).filter((entry) => !reviewed.includes(entry.card_id)),
+    [dueCards.data, reviewed],
+  );
+  const card = queue[0];
   const cardSchedule = useCardSchedule(card?.card_id);
   const intervals = useMemo(
     () => (cardSchedule.data ? previewIntervals(cardSchedule.data) : null),
@@ -39,7 +43,7 @@ export function ReviewPage() {
   );
 
   useEffect(() => {
-    setIndex(0);
+    setReviewed([]);
     setRevealed(false);
   }, [deckId]);
 
@@ -48,16 +52,16 @@ export function ReviewPage() {
   }, [card?.card_id, revealed]);
 
   async function rate(rating: Rating) {
-    if (!user || !card || !cardSchedule.data) return;
+    if (!card || !cardSchedule.data) return;
+    const cardId = card.card_id;
     await reviewCard.mutateAsync({
-      userId: user.id,
-      cardId: card.card_id,
+      cardId,
       current: cardSchedule.data,
       rating,
       elapsedMs: Date.now() - shownAt.current,
     });
     setRevealed(false);
-    setIndex((current) => current + 1);
+    setReviewed((current) => [...current, cardId]);
   }
 
   return (
@@ -79,7 +83,7 @@ export function ReviewPage() {
       />
 
       <div className="flex flex-wrap gap-2 text-sm text-slate-600">
-        <Badge tone="info">{Math.max(0, queue.length - index)} left in this session</Badge>
+        <Badge tone="info">{queue.length} left in this session</Badge>
         <Badge>{stats.data?.reviewedToday ?? 0} reviewed today</Badge>
         {stats.data?.retention !== null && stats.data !== undefined && (
           <Badge tone="success">{stats.data.retention}% retention</Badge>
@@ -90,7 +94,7 @@ export function ReviewPage() {
 
       {dueCards.isLoading
         ? <LoadingBlock />
-        : queue.length === 0
+        : (dueCards.data ?? []).length === 0
         ? (
           <Card>
             <EmptyState
@@ -109,7 +113,16 @@ export function ReviewPage() {
               title="Session complete"
               description="Everything due right now has been reviewed."
               action={
-                <Button size="sm" variant="secondary" onClick={() => dueCards.refetch()}>Check for more</Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setReviewed([]);
+                    void dueCards.refetch();
+                  }}
+                >
+                  Check for more
+                </Button>
               }
             />
           </Card>

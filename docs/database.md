@@ -181,6 +181,11 @@ RLS is enabled on all 21 application tables. Three patterns are used:
    cards→decks, questions→quizzes, answers→attempts, plan items→plans,
    summaries→documents, and any `subject_id` reference→owned subject.
 
+RLS decides *rows*, column privileges decide *columns*: `quiz_questions.correct_answer`
+is revoked from `anon`/`authenticated`, so a student can read and take their own
+quiz but cannot read the answer key out of it — grading runs as the service
+role, which still sees it.
+
 `profiles` has `select`/`update` on `auth.uid() = id` and deliberately no
 `insert` or `delete` policy — creation is the trigger's job and deletion belongs
 to the auth user.
@@ -209,6 +214,10 @@ URLs; `avatars` is world-readable but owner-only for writes.
   as the caller, so RLS still applies.
 - `due_cards` — the review queue (security invoker view).
 - `ai_usage_today` — today's totals per user, for quota checks and the UI meter.
+- `review_card(card_id, rating, state, stability, difficulty, reps, lapses, due_at, elapsed_ms)`
+  — writes the `review_logs` entry and the new `card_schedule` row in one
+  transaction, reading the previous due date and state itself. Runs as the
+  caller, so RLS decides whose card it is.
 - `claim_ingestion_job()` — atomically claims one due job with
   `for update skip locked`, bumps `attempts`, and sets `locked_at`, so multiple
   workers can run safely. Execute is revoked from `anon`/`authenticated` and

@@ -52,44 +52,30 @@ export function useCardSchedule(cardId: string | undefined) {
   });
 }
 
-/** Writes the review log and the next due date in the same user action. */
+/** Writes the review log and the next due date in one transaction. */
 export function useReviewCard() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      userId: string;
       cardId: string;
       current: ScheduleState;
       rating: Rating;
       elapsedMs: number;
     }) => {
       const next = schedule(input.current, input.rating);
-      const reviewedAt = new Date().toISOString();
 
-      const { error: logError } = await supabase.from("review_logs").insert({
-        card_id: input.cardId,
-        user_id: input.userId,
-        rating: input.rating,
-        state_before: input.current.state,
-        state_after: next.state,
-        elapsed_ms: Math.min(input.elapsedMs, 600_000),
-        reviewed_at: reviewedAt,
+      const { error } = await supabase.rpc("review_card", {
+        p_card_id: input.cardId,
+        p_rating: input.rating,
+        p_state: next.state,
+        p_stability: next.stability,
+        p_difficulty: next.difficulty,
+        p_reps: next.reps,
+        p_lapses: next.lapses,
+        p_due_at: next.dueAt.toISOString(),
+        p_elapsed_ms: Math.min(input.elapsedMs, 600_000),
       });
-      if (logError) throw new Error(logError.message);
-
-      const { error: scheduleError } = await supabase
-        .from("card_schedule")
-        .update({
-          state: next.state,
-          stability: next.stability,
-          difficulty: next.difficulty,
-          reps: next.reps,
-          lapses: next.lapses,
-          due_at: next.dueAt.toISOString(),
-          last_reviewed_at: reviewedAt,
-        })
-        .eq("card_id", input.cardId);
-      if (scheduleError) throw new Error(scheduleError.message);
+      if (error) throw new Error(error.message);
 
       return next;
     },
