@@ -43,7 +43,10 @@ export function createGradeHandler(deps: Deps) {
     if (attemptError) throw new ApiError("internal_error", attemptError.message);
     if (!attempt) throw new ApiError("not_found", "Quiz attempt not found.");
 
-    const { data, error } = await ctx.db
+    // The answer key is not readable by the student's own role, so the join
+    // runs as the service role — against the attempt RLS just confirmed is
+    // theirs.
+    const { data, error } = await ctx.admin
       .from("quiz_answers")
       .select(
         "id, question_id, response, quiz_questions(question_type, stem, correct_answer, explanation)",
