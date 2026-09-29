@@ -138,18 +138,47 @@ export function useChatStream() {
   return { answer, error, pendingThreadId, send, stop };
 }
 
+interface CitationRow {
+  message_id: string;
+  chunk_id: string;
+  rank: number;
+  document_chunks: {
+    document_id: string;
+    heading: string | null;
+    page_from: number | null;
+    page_to: number | null;
+  } | null;
+}
+
+/**
+ * Rebuilds the source cards of a persisted transcript, so reloading a chat
+ * shows the same citations the streamed answer did.
+ */
 export function useCitations(messageIds: string[]) {
   return useQuery({
     enabled: messageIds.length > 0,
     queryKey: ["citations", messageIds],
-    queryFn: async () => {
+    queryFn: async (): Promise<Record<string, ChatSource[]>> => {
       const { data, error } = await supabase
         .from("message_citations")
-        .select("message_id, chunk_id, rank, snippet")
+        .select("message_id, chunk_id, rank, document_chunks(document_id, heading, page_from, page_to)")
         .in("message_id", messageIds)
         .order("rank");
       if (error) throw new Error(error.message);
-      return (data ?? []) as { message_id: string; chunk_id: string; rank: number; snippet: string | null }[];
+
+      const byMessage: Record<string, ChatSource[]> = {};
+      for (const row of (data ?? []) as unknown as CitationRow[]) {
+        if (!row.document_chunks) continue;
+        (byMessage[row.message_id] ??= []).push({
+          n: row.rank,
+          chunk_id: row.chunk_id,
+          document_id: row.document_chunks.document_id,
+          heading: row.document_chunks.heading,
+          page_from: row.document_chunks.page_from,
+          page_to: row.document_chunks.page_to,
+        });
+      }
+      return byMessage;
     },
   });
 }

@@ -7,8 +7,18 @@ import type { Document, DocumentSource, Summary } from "@/lib/types";
 const SELECT =
   "id, subject_id, title, source_type, storage_path, mime_type, byte_size, page_count, status, error, ingested_at, created_at";
 
+/** Keeps a list or row fresh while ingestion is still running, so the badge
+ *  advances even where Realtime cannot reach the browser. */
+function pollWhileIngesting(documents: Document[] | undefined): number | false {
+  const busy = (documents ?? []).some((document) =>
+    document.status === "pending" || document.status === "processing"
+  );
+  return busy ? 4000 : false;
+}
+
 export function useDocuments(subjectId?: string | null) {
   return useQuery({
+    refetchInterval: (query) => pollWhileIngesting(query.state.data),
     queryKey: ["documents", subjectId ?? "all"],
     queryFn: async (): Promise<Document[]> => {
       let query = supabase.from("documents").select(SELECT).order("created_at", { ascending: false });
@@ -23,6 +33,7 @@ export function useDocuments(subjectId?: string | null) {
 export function useDocument(id: string | undefined) {
   return useQuery({
     enabled: Boolean(id),
+    refetchInterval: (query) => pollWhileIngesting(query.state.data ? [query.state.data] : []),
     queryKey: ["document", id],
     queryFn: async (): Promise<Document> => {
       const { data, error } = await supabase.from("documents").select(SELECT).eq("id", id!).single();
@@ -34,8 +45,8 @@ export function useDocument(id: string | undefined) {
 
 /**
  * Ingestion runs outside the request, so the row is watched over Realtime and
- * the cache updated in place — no polling, and the badge flips the moment the
- * function marks the document ready.
+ * the cache updated in place: the badge flips the moment the function marks
+ * the document ready, without waiting for the poll above.
  */
 export function useDocumentStatusStream(userId: string | undefined) {
   const queryClient = useQueryClient();

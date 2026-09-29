@@ -1,11 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { MessagesSquare, Plus, SendHorizonal, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Field";
 import { EmptyState, ErrorNotice, LoadingBlock } from "@/components/ui/Feedback";
 import { MessageBubble } from "@/components/tutor/MessageBubble";
 import { SourceList } from "@/components/tutor/SourceList";
-import { useChatStream, useCreateThread, useDeleteThread, useMessages, useThreads } from "@/hooks/useChat";
+import {
+  useChatStream,
+  useCitations,
+  useCreateThread,
+  useDeleteThread,
+  useMessages,
+  useThreads,
+} from "@/hooks/useChat";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useSubjects } from "@/hooks/useSubjects";
 import { useAuth } from "@/providers/AuthProvider";
@@ -31,7 +38,16 @@ export function TutorPage() {
   // A stream belongs to the chat it was started in; another chat must not show
   // its answer or be blocked by it.
   const streamingAnswer = stream.answer?.threadId === activeThreadId ? stream.answer : null;
-  const streaming = stream.pendingThreadId === activeThreadId;
+  const streaming = activeThreadId !== null && stream.pendingThreadId === activeThreadId;
+
+  const assistantMessageIds = useMemo(
+    () =>
+      (messages.data ?? [])
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.id),
+    [messages.data],
+  );
+  const citations = useCitations(assistantMessageIds);
 
   useEffect(() => {
     if (!activeThreadId && threads.data && threads.data.length > 0) setActiveThreadId(threads.data[0].id);
@@ -167,7 +183,16 @@ export function TutorPage() {
               />
             )
             : (messages.data ?? []).map((message) => (
-              <MessageBubble key={message.id} role={message.role} content={message.content} />
+              <MessageBubble
+                key={message.id}
+                role={message.role}
+                content={message.content}
+                footer={
+                  citations.data?.[message.id]
+                    ? <SourceList sources={citations.data[message.id]} documents={documents.data ?? []} />
+                    : undefined
+                }
+              />
             ))}
 
           {streamingAnswer && (

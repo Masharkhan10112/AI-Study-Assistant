@@ -5,6 +5,9 @@
 -- flips the badge without polling. Realtime only forwards changes for tables
 -- in the publication.
 alter publication supabase_realtime add table public.documents;
+-- Realtime authorises each change against the row it carries, so the whole row
+-- has to be in the WAL record, not just the key.
+alter table public.documents replica identity full;
 
 -- RLS makes a quiz readable by its owner, and the answer key lives on the same
 -- row as the question being asked. Column privileges keep the key out of the
