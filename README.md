@@ -6,8 +6,8 @@ flashcards on a spaced-repetition schedule, quizzes, and a study plan.
 
 The backend is Supabase — PostgreSQL (with `pgvector`) for data and retrieval,
 Supabase Auth for identity, Storage for uploaded files, and Edge Functions for
-the AI calls. The React/TypeScript frontend is a later phase; this repository
-currently contains the database schema, Supabase configuration and the REST API.
+the AI calls. The frontend is React + TypeScript + Vite, talking to PostgREST
+for CRUD and to the Edge Functions for anything that needs a provider key.
 
 ## Getting started
 
@@ -18,6 +18,7 @@ npm install
 npx supabase start            # applies all migrations and the seed
 npx supabase status           # copy the API URL and anon key into .env
 cp .env.example .env
+npm run dev                   # http://localhost:5173
 ```
 
 Studio runs at http://127.0.0.1:54323 and the local mail catcher at
@@ -26,6 +27,9 @@ http://127.0.0.1:54324. Sign in as the seeded student with
 
 | Command | Purpose |
 | --- | --- |
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Type-check and build the production bundle |
+| `npm run lint` | Lint the frontend |
 | `npm run db:reset` | Re-apply every migration and re-seed |
 | `npm run db:lint` | Static analysis of the schema |
 | `npm run db:diff` | Diff local changes into a new migration |
@@ -44,6 +48,12 @@ supabase secrets set AI_BASE_URL=... AI_API_KEY=... AI_CHAT_MODEL=... AI_EMBEDDI
 ## Repository layout
 
 ```
+src/
+  components/      shell, UI primitives, feature components
+  hooks/           React Query data hooks per domain
+  lib/             Supabase client, Edge Function client, scheduling, types
+  pages/           dashboard, library, tutor, review, quizzes, plan, settings
+  providers/       auth session context
 supabase/
   config.toml      local stack + auth configuration
   migrations/      schema, RLS, storage, functions (applied in filename order)
@@ -82,3 +92,15 @@ require a Supabase bearer token and answer errors as
 `{"error":{"code":"...","message":"..."}}`.
 
 See [docs/api.md](docs/api.md) for the full reference.
+
+## Frontend at a glance
+
+Supabase Auth owns the session; protected routes live behind a guard and every
+Edge Function call carries the access token. Documents are uploaded straight to
+the private `materials` bucket at `{user}/{document}/source.ext` and then handed
+to `ingest`; status changes arrive over Realtime. The tutor consumes the SSE
+stream from `ai-chat`, rendering tokens as they arrive with the retrieved
+passages as citation cards. Review uses the `due_cards` view with an SM-2 style
+scheduler, and quizzes are graded by `ai-grade` so the answer key never reaches
+the browser. Layouts are mobile-first: a collapsible sidebar, stacked cards and
+full-width dialogs below `lg`.
